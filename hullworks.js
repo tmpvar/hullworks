@@ -6,19 +6,19 @@ function HullWorks(precision) {
   this.precision = precision || this.precision;
 }
 
-HullWorks.prototype.precision = 100;
+HullWorks.prototype.precision = 1000;
 HullWorks.prototype.lightenThreshold = 0.1;
-HullWorks.prototype.cleanThreshold = 0.1;
+HullWorks.prototype.cleanThreshold = 1;
 
 HullWorks.prototype.offset = function(hulls, offsetAmount) {
   var result = null;
 
-  var ignore = {}, paths = new Array(hulls.length);
-
-  for (var j = 0; j<hulls.length; j++) {
+  var ignore = {}, paths = new Array(hulls.length), ret = [];
+  var i, j, k;
+  for (j = 0; j<hulls.length; j++) {
     var path = new Array(hulls[j].points.length);
     var points = hulls[j].points;
-    for (var k = 0; k<points.length; k++) {
+    for (k = 0; k<points.length; k++) {
       path[k] = { X: points[k].x, Y: points[k].y };
     }
 
@@ -34,21 +34,27 @@ HullWorks.prototype.offset = function(hulls, offsetAmount) {
     }
   }
 
+  ret.push(result);
+
   // Holes
-  for (var j = 0; j<paths.length; j++) {
+  for (j = 0; j<paths.length; j++) {
     if (ignore[j] || !paths[j]) {
       continue;
     }
-    var result = this.offsetHull([paths[j]], -offsetAmount);
+
+    result = this.offsetHull([paths[j]], -offsetAmount);
+    var localRet = [result[0]];
 
     var sential = 10000;
     while (result && sential--) {
 
       var offset = this.offsetHull([result[result.length-1]], -offsetAmount);
 
-      if (!offset.length || ClipperLib.Clipper.Area(offset[0]) <= 0) {
+      if (!offset || ClipperLib.Clipper.Area(offset[0]) <= 0) {
         break;
       }
+
+      localRet.push(offset[0]);
 
       // TODO: if the hull is a hole, and a raytrace into the
       // original mesh turns up empty, then we can ignore it as well.
@@ -61,10 +67,14 @@ HullWorks.prototype.offset = function(hulls, offsetAmount) {
 
       result = this.xor(offset, result);
     }
+
+    // TODO: yikes. why is this still scaled?
+    ClipperLib.JS.ScaleDownPaths(result, this.precision);
+    ret.push(localRet.concat(result));
   }
 
-  return result;
-}
+  return ret;
+};
 
 HullWorks.prototype.union = function(a, b) {
   var cpr = new ClipperLib.Clipper();
@@ -83,7 +93,7 @@ HullWorks.prototype.union = function(a, b) {
   ClipperLib.JS.Lighten(ret, this.lightenThreshold);
 
   return ret;
-}
+};
 
 HullWorks.prototype.xor = function(a, b) {
   var cpr = new ClipperLib.Clipper();
@@ -101,12 +111,13 @@ HullWorks.prototype.xor = function(a, b) {
 
   ClipperLib.JS.Lighten(ret, this.lightenThreshold);
   return ret;
-}
+};
 
 HullWorks.prototype.offsetHull = function (paths, offsetAmount) {
   var co = new ClipperLib.ClipperOffset(0, 0);
 
-  ClipperLib.JS.ScaleUpPaths(paths, this.precision)
+  ClipperLib.JS.ScaleUpPaths(paths, this.precision);
+
   co.AddPaths(paths,
     ClipperLib.JoinType.jtMiter,
     ClipperLib.EndType.etClosedPolygon
@@ -114,10 +125,11 @@ HullWorks.prototype.offsetHull = function (paths, offsetAmount) {
 
   var result = new ClipperLib.Paths();
   co.Execute(result, offsetAmount * this.precision);
-  ClipperLib.JS.ScaleDownPaths(result, this.precision)
-  return ClipperLib.JS.Clean(result, this.cleanThreshold);
-}
-
+  if (result.length) {
+    ClipperLib.JS.ScaleDownPaths(result, this.precision);
+    return ClipperLib.JS.Clean(result, this.cleanThreshold);
+  }
+};
 
 if (typeof module !== "undefined" && typeof module.exports == "object") {
   module.exports = HullWorks;

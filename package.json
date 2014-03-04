@@ -1,0 +1,25 @@
+{
+  "name": "hullworks",
+  "version": "0.1.0",
+  "description": "wrapper around clipper.js",
+  "keywords": [],
+  "main": "hullworks.js",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/tmpvar/hullworks.git"
+  },
+  "author": "Elijah Insua <tmpvar@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/tmpvar/hullworks/issues"
+  },
+  "devDependencies": {
+    "mocha": "1.x",
+    "istanbul": "*"
+  },
+  "scripts": {
+    "test": "node_modules/mocha/bin/mocha test/test.js -R spec",
+    "cover": "istanbul cover _mocha -- test/test.js -R spec",
+    "minify": "browserify -e hullworks.js | uglifyjs > hullworks.min.js"
+  }
+}

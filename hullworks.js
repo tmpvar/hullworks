@@ -1,17 +1,25 @@
 if (typeof require !== 'undefined') {
   var ClipperLib = require('./clipper');
+} else {
+  var ClipperLib = window.ClipperLib;
 }
+
+ClipperLib.Error = function(msg) { throw new Error(msg) };
 
 function HullWorks(precision) {
   this.precision = precision || this.precision;
 }
 
-HullWorks.prototype.precision = 1000;
+HullWorks.prototype.precision = 10000;
 HullWorks.prototype.lightenThreshold = 0.1;
 HullWorks.prototype.cleanThreshold = 1;
 
 HullWorks.prototype.offset = function(hulls, offsetAmount) {
   var result = null;
+
+  if (!hulls) {
+    return result;
+  }
 
   var ignore = {}, paths = new Array(hulls.length), ret = [];
   var i, j, k;
@@ -27,7 +35,7 @@ HullWorks.prototype.offset = function(hulls, offsetAmount) {
       if (!result) {
         result = offsetPath;
       } else {
-        result = this.union(offsetPath, result);
+        result = this.union(result, offsetPath);
       }
     } else {
       paths[j] = path;
@@ -43,6 +51,10 @@ HullWorks.prototype.offset = function(hulls, offsetAmount) {
     }
 
     result = this.offsetHull([paths[j]], -offsetAmount);
+    if (!result || !result.length) {
+      continue;
+    }
+
     var localRet = [result[0]];
 
     var sential = 10000;
@@ -68,8 +80,6 @@ HullWorks.prototype.offset = function(hulls, offsetAmount) {
       result = this.xor(offset, result);
     }
 
-    // TODO: yikes. why is this still scaled?
-    ClipperLib.JS.ScaleDownPaths(result, this.precision);
     ret.push(localRet.concat(result));
   }
 
@@ -125,6 +135,8 @@ HullWorks.prototype.offsetHull = function (paths, offsetAmount) {
 
   var result = new ClipperLib.Paths();
   co.Execute(result, offsetAmount * this.precision);
+  ClipperLib.JS.ScaleDownPaths(paths, this.precision);
+
   if (result.length) {
     ClipperLib.JS.ScaleDownPaths(result, this.precision);
     return ClipperLib.JS.Clean(result, this.cleanThreshold);

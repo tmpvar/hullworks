@@ -65,6 +65,8 @@
  *******************************************************************************/
 (function ()
 {
+  var alert = function(msg) { throw new Error(msg); };
+
   "use strict";
   //use_int32: When enabled 32bit ints are used instead of 64bit ints. This
   //improve performance but coordinate values are limited to the range +/- 46340

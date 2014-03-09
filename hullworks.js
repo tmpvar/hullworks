@@ -10,9 +10,9 @@ function HullWorks(precision) {
   this.precision = precision || this.precision;
 }
 
-HullWorks.prototype.precision = 10000;
+HullWorks.prototype.precision = 100000;
 HullWorks.prototype.lightenThreshold = 0.1;
-HullWorks.prototype.cleanThreshold = 1;
+HullWorks.prototype.cleanThreshold = 0.00001;
 
 HullWorks.prototype.offset = function(hulls, offsetAmount) {
   var result = null;
@@ -24,6 +24,10 @@ HullWorks.prototype.offset = function(hulls, offsetAmount) {
   var ignore = {}, paths = new Array(hulls.length), ret = [];
   var i, j, k;
   for (j = 0; j<hulls.length; j++) {
+    if (!hulls[j] || !hulls[j].points || !hulls[j].points.length) {
+      continue;
+    }
+
     var path = new Array(hulls[j].points.length);
     var points = hulls[j].points;
     for (k = 0; k<points.length; k++) {
@@ -62,8 +66,12 @@ HullWorks.prototype.offset = function(hulls, offsetAmount) {
 
       var offset = this.offsetHull([result[result.length-1]], -offsetAmount);
 
-      if (!offset || ClipperLib.Clipper.Area(offset[0]) <= 0) {
+      if (!offset) {
         break;
+      }
+
+      if (ClipperLib.Clipper.Area(offset[0]) < 0) {
+        offset[0].reverse();
       }
 
       localRet.push(offset[0]);
@@ -88,6 +96,14 @@ HullWorks.prototype.offset = function(hulls, offsetAmount) {
 
 HullWorks.prototype.union = function(a, b) {
   var cpr = new ClipperLib.Clipper();
+  if (!a) {
+    return b;
+  }
+
+  if (!b) {
+    return a;
+  }
+
   cpr.AddPaths(a, ClipperLib.PolyType.ptSubject, true);
   cpr.AddPaths(b, ClipperLib.PolyType.ptClip, true);
 
@@ -100,9 +116,9 @@ HullWorks.prototype.union = function(a, b) {
     ClipperLib.PolyFillType.pftNonZero
   );
 
-  ClipperLib.JS.Lighten(ret, this.lightenThreshold);
+  //ClipperLib.JS.Lighten(ret, this.lightenThreshold);
 
-  return ret;
+  return ClipperLib.JS.Clean(ret, this.precision * this.cleanThreshold);
 };
 
 HullWorks.prototype.xor = function(a, b) {
@@ -119,14 +135,19 @@ HullWorks.prototype.xor = function(a, b) {
     ClipperLib.PolyFillType.pftNonZero
   );
 
-  ClipperLib.JS.Lighten(ret, this.lightenThreshold);
-  return ret;
+  //ClipperLib.JS.Lighten(ret, this.lightenThreshold);
+  return ClipperLib.JS.Clean(ret, this.precision * this.cleanThreshold);
 };
 
 HullWorks.prototype.offsetHull = function (paths, offsetAmount) {
+  if (!paths || !paths.length) {
+    return;
+  }
+
   var co = new ClipperLib.ClipperOffset(0, 0);
 
   ClipperLib.JS.ScaleUpPaths(paths, this.precision);
+  ClipperLib.JS.Clean(paths, this.precision * this.cleanThreshold);
 
   co.AddPaths(paths,
     ClipperLib.JoinType.jtMiter,
@@ -137,9 +158,9 @@ HullWorks.prototype.offsetHull = function (paths, offsetAmount) {
   co.Execute(result, offsetAmount * this.precision);
   ClipperLib.JS.ScaleDownPaths(paths, this.precision);
 
-  if (result.length) {
+  if (result && result.length) {
     ClipperLib.JS.ScaleDownPaths(result, this.precision);
-    return ClipperLib.JS.Clean(result, this.cleanThreshold);
+    return ClipperLib.JS.Clean(result, this.precision * this.cleanThreshold);
   }
 };
 
